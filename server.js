@@ -85,7 +85,7 @@ app.post("/analyze", async (req, res) => {
     }
 
     // Tạo request gửi đến Gemini
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
     const body = {
       contents: [
@@ -94,18 +94,18 @@ app.post("/analyze", async (req, res) => {
             {
               inline_data: {
                 mime_type: "image/jpeg",
-                data: image, 
+                data: image,
               },
             },
             {
               text: `
-Bạn là trợ lý hỗ trợ người khiếm thị.
-Hãy phân loại ảnh thành một trong hai loại:
-- [Tài liệu]: Nếu ảnh là giấy tờ, văn bản → đọc toàn bộ nội dung.
-- [Ngữ cảnh]: Nếu ảnh là cảnh vật, vật thể → mô tả ngắn gọn, tự nhiên.
-Trả kết quả theo format:
-Thể loại: [Tài liệu hoặc Ngữ cảnh]
-Nội dung: <nội dung mô tả hoặc OCR>.
+You are an assistant helping visually impaired people.
+Classify the image into one of two types:
+- [Document]: If the image is documents, text → read the entire content.
+- [Context]: If the image is scenes, objects → describe briefly and naturally.
+Return the result in this exact format:
+Type: [Document or Context]
+Content: <description or OCR content>
               `,
             },
           ],
