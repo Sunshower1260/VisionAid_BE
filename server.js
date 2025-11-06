@@ -98,12 +98,12 @@ app.post("/analyze", async (req, res) => {
               },
             },
             {
-              text: `
-You are an assistant helping visually impaired people.
-Classify the image into one of two types:
-- [Document]: If the image is documents, text → read the entire content.
-- [Context]: If the image is scenes, objects → describe briefly and naturally.
-Return the result in this exact format:
+              text: `You are helping a blind person understand this image.
+
+If this image contains text or documents, read all the text exactly.
+If this image shows objects or scenes, describe them in detail.
+
+Provide your response as a clear, natural description that can be read aloud.`,
 Type: [Document or Context]
 Content: <description or OCR content>
               `,
