@@ -104,9 +104,6 @@ If this image contains text or documents, read all the text exactly.
 If this image shows objects or scenes, describe them in detail.
 
 Provide your response as a clear, natural description that can be read aloud.`,
-Type: [Document or Context]
-Content: <description or OCR content>
-              `,
             },
           ],
         },
