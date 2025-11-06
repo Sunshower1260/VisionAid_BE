@@ -185,44 +185,18 @@ app.post('/api/volunteer/request', async (req, res) => {
   }
 
   try {
-    // Lấy volunteer gần nhất
-    const { rows } = await pool.query(`
-      SELECT id, email, latitude, longitude
-      FROM users
-      WHERE role IN ('member', 'vip')
-        AND latitude IS NOT NULL
-        AND longitude IS NOT NULL
-        AND status = 1
-    `);
-
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không có tình nguyện viên nào hoạt động." });
-    }
-
-    // Tìm volunteer gần nhất
-    let nearest = null;
-    let minDistance = Infinity;
-    for (const v of rows) {
-      const dist = haversine(latitude, longitude, v.latitude, v.longitude);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearest = v;
-      }
-    }
-
-    // Lưu request
+    // Lưu request chung, không gán volunteer cụ thể
     const insert = await pool.query(
-      `INSERT INTO volunteer_requests (user_id, volunteer_id, latitude, longitude, status)
-       VALUES ($1, $2, $3, $4, 'pending')
+      `INSERT INTO volunteer_requests (user_id, latitude, longitude, status)
+       VALUES ($1, $2, $3, 'pending')
        RETURNING *`,
-      [userId, nearest.id, latitude, longitude]
+      [userId, latitude, longitude]
     );
 
     res.json({
       success: true,
       message: "Đã gửi yêu cầu hỗ trợ.",
-      request: insert.rows[0],
-      nearestVolunteer: nearest
+      request: insert.rows[0]
     });
 
   } catch (err) {
@@ -231,16 +205,15 @@ app.post('/api/volunteer/request', async (req, res) => {
   }
 });
 
-// Lấy danh sách yêu cầu hỗ trợ đang chờ
-app.get('/api/volunteer/requests/:volunteerId', async (req, res) => {
-  const { volunteerId } = req.params;
+// Lấy danh sách yêu cầu hỗ trợ đang chờ (cho tất cả volunteers)
+app.get('/api/volunteer/requests', async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT vr.*, u.email AS requester_email
+      SELECT vr.*, u.email AS requester_email, u.phone_number
       FROM volunteer_requests vr
       JOIN users u ON u.id = vr.user_id
-      WHERE vr.volunteer_id = $1 AND vr.status = 'pending'
-    `, [volunteerId]);
+      WHERE vr.status = 'pending'
+    `);
 
     res.json({ success: true, requests: rows });
   } catch (err) {
@@ -250,15 +223,28 @@ app.get('/api/volunteer/requests/:volunteerId', async (req, res) => {
 
 //  Volunteer accept yêu cầu
 app.post('/api/volunteer/accept', async (req, res) => {
-  const { requestId } = req.body;
+  const { requestId, volunteerId } = req.body;
+  if (!volunteerId) return res.status(400).json({ success: false, error: "Thiếu volunteerId." });
+
   try {
+    // Cập nhật status và gán volunteer
     await pool.query(`
       UPDATE volunteer_requests
-      SET status = 'accepted'
+      SET status = 'accepted', volunteer_id = $2
       WHERE id = $1
+    `, [requestId, volunteerId]);
+
+    // Lấy phone number của người mù
+    const { rows } = await pool.query(`
+      SELECT u.phone_number
+      FROM volunteer_requests vr
+      JOIN users u ON u.id = vr.user_id
+      WHERE vr.id = $1
     `, [requestId]);
 
-    res.json({ success: true, message: "Đã nhận hỗ trợ người dùng." });
+    const phoneNumber = rows[0]?.phone_number || null;
+
+    res.json({ success: true, message: "Đã nhận hỗ trợ người dùng.", phoneNumber });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
