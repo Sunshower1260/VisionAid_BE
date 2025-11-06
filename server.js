@@ -246,10 +246,13 @@ app.post('/api/volunteer/request', async (req, res) => {
 app.get('/api/volunteer/requests', async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT vr.*, u.email AS requester_email, u.phone_number
+      SELECT vr.*, u.email AS requester_email, u.phone_number, u.role AS requester_role
       FROM volunteer_requests vr
       JOIN users u ON u.id = vr.user_id
       WHERE vr.status = 'pending'
+      ORDER BY
+        CASE WHEN u.role = 'vip' THEN 1 ELSE 2 END,
+        vr.created_at ASC
     `);
 
     res.json({ success: true, requests: rows });
