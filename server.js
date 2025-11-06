@@ -85,7 +85,19 @@ app.post("/analyze", async (req, res) => {
     }
 
     // Tạo request gửi đến Gemini
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+    // Detect image format from base64 data
+    let mimeType = "image/jpeg"; // default
+    if (image.startsWith("/9j/")) {
+      mimeType = "image/jpeg";
+    } else if (image.startsWith("iVBOR")) {
+      mimeType = "image/png";
+    } else if (image.startsWith("R0lGOD")) {
+      mimeType = "image/gif";
+    } else if (image.startsWith("UklGR")) {
+      mimeType = "image/webp";
+    }
 
     const body = {
       contents: [
@@ -93,17 +105,23 @@ app.post("/analyze", async (req, res) => {
           parts: [
             {
               inline_data: {
-                mime_type: "image/jpeg",
+                mime_type: mimeType,
                 data: image,
               },
             },
             {
-              text: `You are helping a blind person understand this image.
+              text: `You are an AI assistant helping a visually impaired person understand what they see in an image.
 
-If this image contains text or documents, read all the text exactly.
-If this image shows objects or scenes, describe them in detail.
+Your task is to provide a clear, detailed description of the image that can be read aloud to help them understand their surroundings.
 
-Provide your response as a clear, natural description that can be read aloud.`,
+Instructions:
+- If the image contains text, read it exactly and clearly
+- Describe objects, people, scenes, and any important details
+- Be specific about colors, shapes, sizes, and positions
+- Keep the description natural and conversational
+- Focus on practical information that would help someone who cannot see
+
+Please provide only the description without any meta-commentary.`,
             },
           ],
         },
@@ -118,9 +136,31 @@ Provide your response as a clear, natural description that can be read aloud.`,
 
     const data = await response.json();
 
+    // Check if Gemini API returned an error
+    if (!response.ok) {
+      console.error("Gemini API Error:", response.status, data);
+      return res.status(500).json({
+        success: false,
+        error: `Gemini API error: ${response.status} - ${data.error?.message || 'Unknown error'}`
+      });
+    }
+
+    // Check for blocked content
+    if (data.candidates && data.candidates[0]?.finishReason === "SAFETY") {
+      console.error("Content blocked by Gemini safety filters");
+      return res.status(400).json({
+        success: false,
+        error: "Nội dung ảnh bị chặn bởi bộ lọc an toàn của Gemini"
+      });
+    }
+
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      console.error("Gemini returned:", data);
-      return res.status(500).json({ success: false, error: "Gemini không trả kết quả hợp lệ" });
+      console.error("Gemini returned unexpected structure:", data);
+      return res.status(500).json({
+        success: false,
+        error: "Gemini trả về cấu trúc dữ liệu không mong muốn",
+        details: data
+      });
     }
 
     const text_result = data.candidates[0].content.parts[0].text;
